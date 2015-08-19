@@ -71,8 +71,8 @@ FUNC should take a callback as its Nth parameter.
 If N is not given, it is assumed FUNC takes a callback as its
 last parameter.
 
-The promise will resolve with the arguments typically passed
-to the callback.
+The promise will resolve with the return value of FUNC and the arguments
+typically passed to the callback.
 
 Example:
 
@@ -86,27 +86,12 @@ Example:
   (lambda (&rest args)
     (promise
      (lambda (resolve reject)
-       (let ((callback (lambda (&rest cbargs) (funcall resolve cbargs))))
+       (let* ((output-value nil)
+              (callback (lambda (&rest cbargs) (funcall resolve (append (list output-value) cbargs)))))
          (let ((args (if (and n (< n (length args)))
                          (if (zerop n)
                              (append (list callback) args)
                            (push callback (cdr (nthcdr (1- n) args)))
                            args)
                        (append args (list callback)))))
-           (apply func args)))))))
-
-(defun get-files-async ()
-  (promise
-   (lambda (resolve reject)
-     (let* ((buffer (generate-new-buffer "ls-buffer"))
-            (proc (start-process "ls" buffer "ls" "-j")))
-       (set-process-sentinel
-        proc
-        (lambda (proc state)
-          (unless (process-live-p proc)
-            (let ((string (with-current-buffer buffer (buffer-string))))
-              (kill-buffer buffer)
-              (if (zerop (process-exit-status proc))
-                  (funcall resolve (split-string string "\n" t)))
-              (funcall reject (list (process-exit-status proc) state string))))))))))
-
+           (setq output-value (apply func args))))))))
