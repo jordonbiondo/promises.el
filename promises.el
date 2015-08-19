@@ -1,5 +1,8 @@
 ;;; promises.el --- Promises -*- lexical-binding: t; -*-
 
+(eval-when-compile
+  (require 'cl-lib))
+
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
   (puthash :done t prom)
@@ -57,6 +60,7 @@ FUNC must be in the form (lambda (resolve reject) ...)."
     p))
 
 (defun delay-time (seconds func)
+  (declare (indent 1))
   (let ((p (make-promise func)))
     (puthash :delay seconds p)
     (promise--kickoff p)
@@ -97,7 +101,10 @@ or reject on an error that occurs in FUNC."
     obj))
 
 (defun resolved-promise (val)
-  (promise (lambda (resolve reject) (funcall resolve val))))
+  (promise
+   (lambda (resolve reject)
+     (ignore reject)
+     (funcall resolve val))))
 
 (defun promisify (func &optional n)
   "Promisify a callback-based function FUNC.
@@ -122,6 +129,7 @@ Example:
   (lambda (&rest args)
     (promise
      (lambda (resolve reject)
+       (ignore reject)
        (let* ((output-value nil)
               (callback (lambda (&rest cbargs) (funcall resolve (append (list output-value) cbargs)))))
          (let ((args (if (and n (< n (length args)))
