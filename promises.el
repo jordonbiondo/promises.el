@@ -3,11 +3,13 @@
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
   (puthash :done t prom)
+  (puthash :resolved t prom)
   (promise--notify prom))
 
 (defun promise--reject(prom val)
   (puthash :reject val prom)
   (puthash :done t prom)
+  (puthash :rejected t prom)
   (promise--notify prom))
 
 (defun promise--notify (prom)
