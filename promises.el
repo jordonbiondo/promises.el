@@ -16,11 +16,16 @@
       (promise--kickoff listener))))
 
 (defun promise--kickoff (prom)
-  (puthash :timer (run-with-timer
-                   0 nil
-                   (lambda ()
-                     (apply (gethash :perform prom) nil)))
-           prom))
+  (let ((delay (gethash :delay prom)))
+    (if delay
+        (puthash :timer
+                 (run-with-timer
+                  delay nil
+                  (lambda ()
+                    (apply (gethash :perform prom) nil)))
+                 prom)
+      (apply (gethash :perform prom) nil))))
+
 
 (defun make-promise (func)
   (let ((obj (make-hash-table :test 'equal)))
@@ -40,12 +45,20 @@
 
 FUNC must be in the form (lambda (resolve reject) ...)."
   (let ((obj (make-promise func)))
-    (puthash :timer (run-with-timer
-                     0 nil
-                     (lambda ()
-                       (apply (gethash :perform obj) nil)))
-             obj)
+    (promise--kickoff obj)
     obj))
+
+(defun delay (func)
+  (let ((p (make-promise func)))
+    (puthash :delay 0 p)
+    (promise--kickoff p)
+    p))
+
+(defun delay-time (seconds func)
+  (let ((p (make-promise func)))
+    (puthash :delay seconds p)
+    (promise--kickoff p)
+    p))
 
 (defun promisep (promise)
   (and (hash-table-p promise)
