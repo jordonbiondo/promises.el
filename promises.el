@@ -53,6 +53,42 @@ FUNC must be in the form (lambda (resolve reject) ...)."
     (promise--kickoff obj)
     obj))
 
+(defmacro promise* (args &rest body)
+  "Convenience wrapper for `promise'.
+
+BODY is the body of the promise's function.
+
+ARGS should be a list of two symbols in the form of (resolve reject).
+
+Unlike `promise', the resolve and reject symbols are temporarily bound
+as functions which you can call directly instead of using funcall or apply.
+
+Example:
+
+    (promise* (resolve reject)
+      (let ((value (get-some-value)))
+        (if (> value 0)
+            (resolve value)
+          (reject \"Invalid Value\"))))
+
+this is equivalent to:
+
+    (promise
+     (lambda (resolve reject)
+       (let ((value (get-some-value)))
+         (if (> value 0)
+             (funcall resolve value)
+           (funcall reject \"Invalid Value\")))))"
+  (declare (indent 1))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+
+    `(promise
+      (lambda (,resolve-param ,reject-param)
+        (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                    (,(cadr args) (value) (funcall ,reject-param value)))
+          ,@body)))))
+
 (defun delay (func)
   (let ((p (make-promise func)))
     (puthash :delay 0 p)
@@ -99,6 +135,22 @@ or reject on an error that occurs in FUNC."
                       (funcall resolve output))))))))
     (promise--listen obj promise)
     obj))
+
+(defmacro then* (promise args &rest body)
+  "Convenience wrapper for `then'.
+
+ARGS and BODY are used for the promises function.
+Example:
+
+    (then* promise (err value)
+      (+ value 2))
+
+this is equivalent to:
+
+    (then promise (lambda (err value)
+            (+ value 2)))"
+  (declare (indent 2))
+  `(then ,promise (lambda ,args ,@body)))
 
 (defun resolved-promise (val)
   (promise
