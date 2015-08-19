@@ -2,10 +2,12 @@
 
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
+  (puthash :done t prom)
   (promise--notify prom))
 
 (defun promise--reject(prom val)
   (puthash :reject val prom)
+  (puthash :done t prom)
   (promise--notify prom))
 
 (defun promise--notify (prom)
@@ -24,6 +26,7 @@
   (let ((obj (make-hash-table :test 'equal)))
     (let ((resolve (apply-partially 'promise--resolve obj))
           (reject (apply-partially 'promise--reject obj)))
+      (puthash :promisep t obj)
       (puthash :perform
                (lambda ()
                  (condition-case err
@@ -44,6 +47,17 @@ FUNC must be in the form (lambda (resolve reject) ...)."
              obj)
     obj))
 
+(defun promisep (promise)
+  (and (hash-table-p promise)
+       (gethash :promisep promise)
+       (gethash :perform promise)))
+
+(defun promise--listen (listener notifier)
+  (if (gethash :done notifier)
+      (promise--kickoff listener)
+    (push listener (gethash :listeners notifier))))
+
+
 (defun then (promise func)
   "After PROMISE resolves or is rejected, run FUNC.
 
@@ -56,8 +70,15 @@ or reject on an error that occurs in FUNC."
               (lambda (resolve reject)
                 (let ((err (gethash :reject promise))
                       (value (gethash :resolve promise)))
-                  (funcall resolve (apply func (list err value))))))))
-    (push obj (gethash :listeners promise))
+                  (let ((output (apply func (list err value))))
+                    (if (promisep output)
+                        (then output
+                              (lambda (err value)
+                                (if err
+                                    (funcall reject err)
+                                  (funcall resolve value))))
+                      (funcall resolve output))))))))
+    (promise--listen obj promise)
     obj))
 
 (defun resolved-promise (val)
