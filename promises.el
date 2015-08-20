@@ -1,7 +1,9 @@
 ;;; promises.el --- Promises -*- lexical-binding: t; -*-
 
-(eval-when-compile
-  (require 'cl-lib))
+(eval-and-compile
+  (require 'cl-lib)
+  (require 'dash)
+  (require 'async))
 
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
@@ -34,8 +36,8 @@
 
 (defun make-promise (func)
   (let ((obj (make-hash-table :test 'equal)))
-    (let ((resolve (apply-partially 'promise--resolve obj))
-          (reject (apply-partially 'promise--reject obj)))
+    (let ((resolve (lambda (val) (promise--resolve obj val)))
+          (reject (lambda (val) (promise--reject obj val))))
       (puthash :promisep t obj)
       (puthash :perform
                (lambda ()
@@ -191,3 +193,25 @@ Example:
                            args)
                        (append args (list callback)))))
            (setq output-value (apply func args))))))))
+
+(defun promise-async (func)
+  "Create an asynchronous promise using `async-start'
+
+FUNC will be evaluated in another emacs process and
+the promise will resolve with the return value, or reject
+with any errors that may occur."
+  (let ((wrapped-func
+         (lambda ()
+           (condition-case err
+               (list 'val (apply func nil))
+             (error (list 'err err))))))
+    (promise* (ok nope)
+      (async-start
+       wrapped-func
+       (lambda (val)
+         (if (equal (car val) 'val)
+             (ok (cadr val))
+           (nope (cadr val))))))))
+
+(defmacro promise-async* (&rest body)
+  `(promise-async (lambda () ,@body)))
