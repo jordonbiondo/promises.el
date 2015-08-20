@@ -92,17 +92,41 @@ this is equivalent to:
           ,@body)))))
 
 (defun delay (func)
+  "Create a promise that will execute on a 0 second timer.
+
+Effectively this will wait to run until the current stack clears."
   (let ((p (make-promise func)))
     (puthash :delay 0 p)
     (promise--kickoff p)
     p))
 
+(defmacro delay* (args &rest body)
+  (declare (indent 1))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+    `(delay
+      (lambda (,resolve-param ,reject-param)
+        (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                    (,(cadr args) (value) (funcall ,reject-param value)))
+          ,@body)))))
+
 (defun delay-time (seconds func)
+  "Create a promise that will execute after SECONDS."
   (declare (indent 1))
   (let ((p (make-promise func)))
     (puthash :delay seconds p)
     (promise--kickoff p)
     p))
+
+(defmacro delay-time* (seconds args &rest body)
+  (declare (indent 2))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+    `(delay-time ,seconds
+      (lambda (,resolve-param ,reject-param)
+        (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                    (,(cadr args) (value) (funcall ,reject-param value)))
+          ,@body)))))
 
 (defun promisep (promise)
   (and (hash-table-p promise)
