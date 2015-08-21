@@ -197,6 +197,36 @@ or reject on an error that occurs in FUNC."
     (promise--listen obj promise)
     obj))
 
+(defun then2 (promise func &optional err-func)
+  "After PROMISE resolves or is rejected, run FUNC.
+
+FUNC will be passed two parameters, the error, if any, from PROMISE,
+and the resolved value from PROMISE, if any.
+
+A new promise is returned that will resolve to the return value of FUNC,
+or reject on an error that occurs in FUNC."
+  (let ((obj (make-promise
+              (lambda (resolve reject)
+                (let ((err (gethash :reject promise))
+                      (value (gethash :resolve promise)))
+                  (let ((output nil))
+                    (if (gethash :rejected promise)
+                        (if err-func
+                            (setq output (apply err-func (list err)))
+                          (setq output (promise (lambda (resolve reject) (funcall reject err)))))
+                      (if func
+                          (setq output (apply func (list value)))
+                        (setq output (resolved-promise value))))
+                    (if (promisep output)
+                        (then output
+                              (lambda (err value)
+                                (if err
+                                    (funcall reject err)
+                                  (funcall resolve value))))
+                      (funcall resolve output))))))))
+    (promise--listen obj promise)
+    obj))
+
 (defmacro then* (promise args &rest body)
   "Convenience wrapper for `then'.
 
