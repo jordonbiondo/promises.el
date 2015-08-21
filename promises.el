@@ -227,7 +227,7 @@ or reject on an error that occurs in FUNC."
                     (if (gethash :rejected promise)
                         (if err-func
                             (setq output (apply err-func (list err)))
-                          (setq output (promise (lambda (resolve reject) (funcall reject err)))))
+                          (setq output (rejected-promise err)))
                       (if func
                           (setq output (apply func (list value)))
                         (setq output (resolved-promise value))))
