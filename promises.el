@@ -126,6 +126,16 @@ this is equivalent to:
                     (,(cadr args) (value) (funcall ,reject-param value)))
           ,@body)))))
 
+(defun resolved-promise (val)
+  "Create a promise immediately resolved with VAL."
+  (promise* (resolve reject)
+    (resolve val)))
+
+(defun rejected-promise (val)
+  "Create a promise immediately rejecting VAL."
+  (promise* (resolve reject)
+    (reject val)))
+
 (defun delay (func)
   "Create a promise that will execute on a 0 second timer.
 
@@ -242,12 +252,6 @@ this is equivalent to:
             (+ value 2)))"
   (declare (indent 2))
   `(then ,promise (lambda ,args ,@body)))
-
-(defun resolved-promise (val)
-  (promise
-   (lambda (resolve reject)
-     (ignore reject)
-     (funcall resolve val))))
 
 (defun promisify (func &optional n)
   "Promisify a callback-based function FUNC.
