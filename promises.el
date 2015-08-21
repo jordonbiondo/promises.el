@@ -313,7 +313,6 @@ with any errors that may occur."
   (let ((values (make-list (length promises) nil))
         (real-promises (-filter 'promisep promises)))
     (promise* (resolve reject)
-      (setq asdfasdf promises)
       (dotimes (n (length promises))
         (let ((prom (nth n promises)))
           (unless (promisep prom)
