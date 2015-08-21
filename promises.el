@@ -168,10 +168,10 @@ Effectively this will wait to run until the current stack clears."
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
         (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
     `(delay-time ,seconds
-      (lambda (,resolve-param ,reject-param)
-        (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
-                    (,(cadr args) (value) (funcall ,reject-param value)))
-          ,@body)))))
+       (lambda (,resolve-param ,reject-param)
+         (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                     (,(cadr args) (value) (funcall ,reject-param value)))
+           ,@body)))))
 
 (defun promisep (promise)
   (and (hash-table-p promise)
