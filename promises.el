@@ -41,6 +41,10 @@
 ;;
 ;;; Code:
 
+(eval-and-compile
+  (require 'dash)
+  (require 'async))
+
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
   (puthash :done t prom)
