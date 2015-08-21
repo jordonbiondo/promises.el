@@ -33,9 +33,8 @@
                  prom)
       (apply (gethash :perform prom) nil))))
 
-
 (defun make-promise (func)
-  (let ((obj (make-hash-table :test 'equal)))
+  (let ((obj (make-hash-table :test 'equal :size 10)))
     (let ((resolve (lambda (val) (promise--resolve obj val)))
           (reject (lambda (val) (promise--reject obj val))))
       (puthash :promisep t obj)
