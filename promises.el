@@ -1,9 +1,45 @@
 ;;; promises.el --- Promises -*- lexical-binding: t; -*-
-
-(eval-and-compile
-  (require 'cl-lib)
-  (require 'dash)
-  (require 'async))
+;;
+;; Filename: promises.el
+;; Description: Promises for Emacs
+;; Author: Jordon Biondo <jordonbiondo@gmail.com>
+;; Copyright (c) 2015 Jordon Biondo <jordonbiondo@gmail.com>
+;; Version: 0.0.1
+;; URL: https://github.com/jordonbiondo/promises.el
+;; Package-Requires: ((async "20150818") (dash "2.11.0") (cl-lib "0.3") (emacs "24.3"))
+;; Keywords: convenience
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;; Commentary:
+;;
+;;  Promises for Emacs
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; The MIT License (MIT)
+;;
+;; Copyright (c) 2015 Jordon Biondo
+;;
+;; Permission is hereby granted, free of charge, to any person obtaining a copy
+;; of this software and associated documentation files (the "Software"), to deal
+;; in the Software without restriction, including without limitation the rights
+;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+;; copies of the Software, and to permit persons to whom the Software is
+;; furnished to do so, subject to the following conditions:
+;;
+;; The above copyright notice and this permission notice shall be included in
+;; all copies or substantial portions of the Software.
+;;
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+;; AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+;; THE SOFTWARE.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;; Code:
 
 (defun promise--resolve(prom val)
   (puthash :resolve val prom)
@@ -255,3 +291,7 @@ with any errors that may occur."
                     (setf (nth n values) value)
                     (when (-all? (lambda (p) (gethash :done p)) real-promises)
                       (resolve values))))))))))
+
+(provide 'promises)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; promises.el ends here
