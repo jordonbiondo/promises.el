@@ -238,3 +238,20 @@ with any errors that may occur."
 
 (defmacro promise-async* (&rest body)
   `(promise-async (lambda () ,@body)))
+
+(defun promise-all (promises)
+  (let ((values (make-list (length promises) nil))
+        (real-promises (-filter 'promisep promises)))
+    (promise* (resolve reject)
+      (setq asdfasdf promises)
+      (dotimes (n (length promises))
+        (let ((prom (nth n promises)))
+          (unless (promisep prom)
+            (setq prom (resolved-promise prom)))
+          (then prom
+                (lambda (err value)
+                  (if err
+                      (reject err)
+                    (setf (nth n values) value)
+                    (when (-all? (lambda (p) (gethash :done p)) real-promises)
+                      (resolve values))))))))))
