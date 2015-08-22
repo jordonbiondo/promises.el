@@ -45,45 +45,53 @@
   (require 'dash)
   (require 'async))
 
-(defun promise--resolve(prom val)
-  (puthash :resolve val prom)
-  (puthash :done t prom)
-  (puthash :resolved t prom)
+(cl-defstruct promise-obj
+  resolve
+  reject
+  resolved
+  rejected
+  done
+  delay
+  timer
+  perform
+  listeners)
+
+(defun promise--resolve (prom val)
+  (setf (promise-obj-resolve prom) val)
+  (setf (promise-obj-done prom) t)
+  (setf (promise-obj-resolved prom) t)
   (promise--notify prom))
 
-(defun promise--reject(prom val)
-  (puthash :reject val prom)
-  (puthash :done t prom)
-  (puthash :rejected t prom)
+(defun promise--reject (prom val)
+  (setf (promise-obj-reject prom) val)
+  (setf (promise-obj-done prom) t)
+  (setf (promise-obj-rejected prom) t)
   (promise--notify prom))
 
 (defun promise--notify (prom)
-  (let ((listeners (gethash :listeners prom)))
+  (let ((listeners (promise-obj-listeners prom)))
     (dolist (listener listeners)
       (promise--kickoff listener))))
 
 (defun promise--kickoff (prom)
-  (let ((delay (gethash :delay prom)))
+  (let ((delay (promise-obj-delay prom)))
     (if delay
-        (puthash :timer
-                 (run-with-timer
-                  delay nil
-                  (lambda ()
-                    (apply (gethash :perform prom) nil)))
-                 prom)
-      (apply (gethash :perform prom) nil))))
+        (setf (promise-obj-timer prom)
+              (run-with-timer
+               delay nil
+               (lambda ()
+                 (apply (promise-obj-perform prom) nil))))
+      (apply (promise-obj-perform prom) nil))))
 
 (defun make-promise (func)
-  (let ((obj (make-hash-table :test 'equal :size 10)))
+  (let ((obj (make-promise-obj)))
     (let ((resolve (lambda (val) (promise--resolve obj val)))
           (reject (lambda (val) (promise--reject obj val))))
-      (puthash :promisep t obj)
-      (puthash :perform
-               (lambda ()
-                 (condition-case err
-                     (apply func (list resolve reject))
-                   (error (funcall reject err))))
-               obj)
+      (setf (promise-obj-perform obj)
+            (lambda ()
+              (condition-case err
+                  (apply func (list resolve reject))
+                (error (funcall reject err)))))
       obj)))
 
 (defun promise (func)
@@ -145,7 +153,7 @@ this is equivalent to:
 
 Effectively this will wait to run until the current stack clears."
   (let ((p (make-promise func)))
-    (puthash :delay 0 p)
+    (setf (promise-obj-delay p) 0)
     (promise--kickoff p)
     p))
 
@@ -163,7 +171,7 @@ Effectively this will wait to run until the current stack clears."
   "Create a promise that will execute after SECONDS."
   (declare (indent 1))
   (let ((p (make-promise func)))
-    (puthash :delay seconds p)
+    (setf (promise-obj-delay p) seconds)
     (promise--kickoff p)
     p))
 
@@ -178,14 +186,12 @@ Effectively this will wait to run until the current stack clears."
            ,@body)))))
 
 (defun promisep (promise)
-  (and (hash-table-p promise)
-       (gethash :promisep promise)
-       (gethash :perform promise)))
+  (promise-obj-p promise))
 
 (defun promise--listen (listener notifier)
-  (if (gethash :done notifier)
+  (if (promise-obj-done notifier)
       (promise--kickoff listener)
-    (push listener (gethash :listeners notifier))))
+    (push listener (promise-obj-listeners notifier))))
 
 
 (defun then (promise func)
@@ -198,8 +204,8 @@ A new promise is returned that will resolve to the return value of FUNC,
 or reject on an error that occurs in FUNC."
   (let ((obj (make-promise
               (lambda (resolve reject)
-                (let ((err (gethash :reject promise))
-                      (value (gethash :resolve promise)))
+                (let ((err (promise-obj-reject promise))
+                      (value (promise-obj-resolve promise)))
                   (let ((output (apply func (list err value))))
                     (if (promisep output)
                         (then output
@@ -221,10 +227,10 @@ A new promise is returned that will resolve to the return value of FUNC,
 or reject on an error that occurs in FUNC."
   (let ((obj (make-promise
               (lambda (resolve reject)
-                (let ((err (gethash :reject promise))
-                      (value (gethash :resolve promise)))
+                (let ((err (promise-obj-reject promise))
+                      (value (promise-obj-resolve promise)))
                   (let ((output nil))
-                    (if (gethash :rejected promise)
+                    (if (promise-obj-rejected promise)
                         (if err-func
                             (setq output (apply err-func (list err)))
                           (setq output (rejected-promise err)))
@@ -254,7 +260,7 @@ this is equivalent to:
 
     (then promise (lambda (err value)
             (+ value 2)))"
-  (declare (indent 2))
+  (declare (indent defun))
   `(then ,promise (lambda ,args ,@body)))
 
 (defun promisify (func &optional n)
@@ -326,7 +332,7 @@ with any errors that may occur."
                   (if err
                       (reject err)
                     (setf (nth n values) value)
-                    (when (-all? (lambda (p) (gethash :done p)) real-promises)
+                    (when (-all? 'promise-obj-done real-promises)
                       (resolve values))))))))))
 
 (provide 'promises)
