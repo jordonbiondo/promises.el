@@ -193,38 +193,48 @@ Effectively this will wait to run until the current stack clears."
       (promise--kickoff listener)
     (push listener (promise-obj-listeners notifier))))
 
-
-(defun then (promise func)
+(defun regardless (promise func &optional with-status)
   "After PROMISE resolves or is rejected, run FUNC.
 
 FUNC will be passed two parameters, the error, if any, from PROMISE,
 and the resolved value from PROMISE, if any.
+
+When WITH-STATUS is non-nil, a third argument will be passed to FUNC
+describing the exit status of PROMISE, it will be `:rejected' or `:resolved'.
 
 A new promise is returned that will resolve to the return value of FUNC,
 or reject on an error that occurs in FUNC."
   (let ((obj (make-promise
               (lambda (resolve reject)
                 (let ((err (promise-obj-reject promise))
-                      (value (promise-obj-resolve promise)))
-                  (let ((output (apply func (list err value))))
+                      (value (promise-obj-resolve promise))
+                      (status (if (promise-obj-rejected promise) :rejected :resolved)))
+                  (let ((output
+                         (apply func
+                                (cons err
+                                      (cons value
+                                            (and with-status (list status)))))))
                     (if (promisep output)
-                        (then output
-                              (lambda (err value)
-                                (if err
-                                    (funcall reject err)
-                                  (funcall resolve value))))
+                        (regardless output
+                          (lambda (err value)
+                            (if err
+                                (funcall reject err)
+                              (funcall resolve value))))
                       (funcall resolve output))))))))
     (promise--listen obj promise)
     obj))
 
-(defun then2 (promise func &optional err-func)
-  "After PROMISE resolves or is rejected, run FUNC.
+(defmacro regardless* (promise args &rest body)
+  "TODO: write docs."
+  `(regardless ,promise (lambda ,args ,@body) ,(= (length args) 3)))
 
-FUNC will be passed two parameters, the error, if any, from PROMISE,
-and the resolved value from PROMISE, if any.
 
-A new promise is returned that will resolve to the return value of FUNC,
-or reject on an error that occurs in FUNC."
+(defun then (promise func &optional err-func)
+  "After PROMISE resolves run FUNC, or if rejected, run ERR-FUNC.
+
+A new promise is returned that will resolve to the return value of FUNC or ERR-FUNC,
+or reject on an error that occurs in the called function."
+  (declare (indent defun))
   (let ((obj (make-promise
               (lambda (resolve reject)
                 (let ((err (promise-obj-reject promise))
@@ -238,30 +248,29 @@ or reject on an error that occurs in FUNC."
                           (setq output (apply func (list value)))
                         (setq output (resolved-promise value))))
                     (if (promisep output)
-                        (then output
-                              (lambda (err value)
-                                (if err
-                                    (funcall reject err)
-                                  (funcall resolve value))))
+                        (regardless output
+                          (lambda (err value)
+                            (if err
+                                (funcall reject err)
+                              (funcall resolve value))))
                       (funcall resolve output))))))))
     (promise--listen obj promise)
     obj))
 
 (defmacro then* (promise args &rest body)
-  "Convenience wrapper for `then'.
-
-ARGS and BODY are used for the promises function.
-Example:
-
-    (then* promise (err value)
-      (+ value 2))
-
-this is equivalent to:
-
-    (then promise (lambda (err value)
-            (+ value 2)))"
+  "TODO: write docs."
   (declare (indent defun))
   `(then ,promise (lambda ,args ,@body)))
+
+(defun on-error (promise err-func)
+  "TODO: write docs."
+  (then promise nil err-func))
+
+(defmacro on-error* (promise args &rest body)
+  "TODO: write docs."
+  (declare (indent defun))
+  `(on-error ,promise (lambda ,args ,@body)))
+
 
 (defun promisify (func &optional n)
   "Promisify a callback-based function FUNC.
@@ -320,6 +329,7 @@ with any errors that may occur."
   `(promise-async (lambda () ,@body)))
 
 (defun promise-all (promises)
+  "Broken."
   (let ((values (make-list (length promises) nil))
         (real-promises (-filter 'promisep promises)))
     (promise* (resolve reject)
@@ -327,13 +337,14 @@ with any errors that may occur."
         (let ((prom (nth n promises)))
           (unless (promisep prom)
             (setq prom (resolved-promise prom)))
-          (then prom
-                (lambda (err value)
-                  (if err
-                      (reject err)
-                    (setf (nth n values) value)
-                    (when (-all? 'promise-obj-done real-promises)
-                      (resolve values))))))))))
+          (regardless prom
+            (lambda (err value)
+              (if (promise-obj-rejected prom)
+                  (reject err)
+                (setf (nth n values) value)
+                (when (-all? 'promise-obj-done real-promises)
+                  (resolve values))))))))))
+
 
 (provide 'promises)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
