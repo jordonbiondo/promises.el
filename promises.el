@@ -231,7 +231,6 @@ or reject on an error that occurs in FUNC."
   "TODO: write docs."
   `(regardless ,promise (lambda ,args ,@body) ,(= (length args) 3)))
 
-
 (defun then (promise func &optional err-func)
   "After PROMISE resolves run FUNC, or if rejected, run ERR-FUNC.
 
@@ -273,7 +272,6 @@ or ERR-FUNC, or reject on an error that occurs in the called function."
   "TODO: write docs."
   (declare (indent defun))
   `(on-error ,promise (lambda ,args ,@body)))
-
 
 (defun promisify (func &optional n)
   "Promisify a callback-based function FUNC.
@@ -353,9 +351,6 @@ with any errors that may occur."
                                      promises)))))
              t)
            (incf i)))))))
-
-
-
 
 (provide 'promises)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

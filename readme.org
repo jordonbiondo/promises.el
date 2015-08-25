@@ -1,0 +1,59 @@
+* promises.el
+  Promises for Emacs
+** Examples
+   #+BEGIN_SRC emacs-lisp
+     ;; prints 15
+     (let ((my-promise 
+            (promise 
+             (lambda (reject resolve)
+               (funcall resolve 5)))))
+       (regardless my-promise
+         (lambda (err value)
+           (print (+ value 10)))))
+
+     ;; async mapping
+     (then (promise-all (mapcar
+                         (lambda (v) (promise-async (lambda () (expt v 2))))
+                         (number-sequence 0 10)))
+       (lambda (values)
+         (message "%S" values)))
+
+     ;; using a threading macro and special promise forms
+     ;; square every number 0-10 asynchronously
+     ;; then multiple each by 5 asynchronously
+     ;; message the results when done
+     ;; if an error occurs anytime during execution log the error
+     ;;
+     ;; Output: "Results: (0 5 20 45 80 125 180 245 320 405 500)"
+     (-> (promise-all (mapcar
+                       (lambda (v) (promise-async* (expt v 2)))
+                       (number-sequence 0 10)))
+         (then* (values)
+           (promise-all (mapcar
+                         (lambda (v) (promise-async* (* v 5)))
+                         values)))
+         (then* (values)
+           (message "Results: %S" values))
+         (on-error* (err)
+           (message "Oops: %S" err)))
+
+
+     ;; promisifying a callback-based function
+     (defun my-slow-multiplier (a b callback)
+       "After three seconds run CALLBACK with 
+     the result of multiplying A and B."
+       (run-with-timer
+        3
+        nil
+        (lambda () (funcall callback (* a b)))))
+
+     (defalias 'my-promise-multiplier (promisify 'my-slow-multiplier))
+
+     (regardless* (my-promise-multiplier 5 6) (err output)
+       (destructuring-bind (return-value result) output
+         (message "Got: %S" result)))
+
+       
+
+
+   #+END_SRC
