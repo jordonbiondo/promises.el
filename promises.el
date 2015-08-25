@@ -159,8 +159,8 @@ Effectively this will wait to run until the current stack clears."
 
 (defmacro delay* (args &rest body)
   (declare (indent 1))
-  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
-        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
     `(delay
       (lambda (,resolve-param ,reject-param)
         (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
@@ -177,8 +177,8 @@ Effectively this will wait to run until the current stack clears."
 
 (defmacro delay-time* (seconds args &rest body)
   (declare (indent 2))
-  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
-        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
     `(delay-time ,seconds
        (lambda (,resolve-param ,reject-param)
          (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
@@ -208,12 +208,15 @@ or reject on an error that occurs in FUNC."
               (lambda (resolve reject)
                 (let ((err (promise-obj-reject promise))
                       (value (promise-obj-resolve promise))
-                      (status (if (promise-obj-rejected promise) :rejected :resolved)))
+                      (status (if (promise-obj-rejected promise)
+                                  :rejected
+                                :resolved)))
                   (let ((output
-                         (apply func
-                                (cons err
-                                      (cons value
-                                            (and with-status (list status)))))))
+                         (apply
+                          func
+                          (cons err
+                                (cons value
+                                      (and with-status (list status)))))))
                     (if (promisep output)
                         (regardless output
                           (lambda (err value)
@@ -232,21 +235,21 @@ or reject on an error that occurs in FUNC."
 (defun then (promise func &optional err-func)
   "After PROMISE resolves run FUNC, or if rejected, run ERR-FUNC.
 
-A new promise is returned that will resolve to the return value of FUNC or ERR-FUNC,
-or reject on an error that occurs in the called function."
+A new promise is returned that will resolve to the return value of FUNC
+or ERR-FUNC, or reject on an error that occurs in the called function."
   (declare (indent defun))
   (let ((obj (make-promise
               (lambda (resolve reject)
                 (let ((err (promise-obj-reject promise))
                       (value (promise-obj-resolve promise)))
-                  (let ((output nil))
-                    (if (promise-obj-rejected promise)
-                        (if err-func
-                            (setq output (apply err-func (list err)))
-                          (setq output (rejected-promise err)))
-                      (if func
-                          (setq output (apply func (list value)))
-                        (setq output (resolved-promise value))))
+                  (let ((output
+                         (if (promise-obj-rejected promise)
+                             (if err-func
+                                 (apply err-func (list err))
+                               (rejected-promise err))
+                           (if func
+                               (apply func (list value))
+                             (resolved-promise value)))))
                     (if (promisep output)
                         (regardless output
                           (lambda (err value)
@@ -297,7 +300,9 @@ Example:
      (lambda (resolve reject)
        (ignore reject)
        (let* ((output-value nil)
-              (callback (lambda (&rest cbargs) (funcall resolve (append (list output-value) cbargs)))))
+              (callback
+               (lambda (&rest cbargs)
+                 (funcall resolve (append (list output-value) cbargs)))))
          (let ((args (if (and n (< n (length args)))
                          (if (zerop n)
                              (append (list callback) args)
