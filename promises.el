@@ -329,21 +329,27 @@ with any errors that may occur."
   `(promise-async (lambda () ,@body)))
 
 (defun promise-all (promises)
-  "Broken."
-  (let ((values (make-list (length promises) nil))
-        (real-promises (-filter 'promisep promises)))
-    (promise* (resolve reject)
-      (dotimes (n (length promises))
-        (let ((prom (nth n promises)))
-          (unless (promisep prom)
-            (setq prom (resolved-promise prom)))
-          (regardless prom
-            (lambda (err value)
-              (if (promise-obj-rejected prom)
-                  (reject err)
-                (setf (nth n values) value)
-                (when (-all? 'promise-obj-done real-promises)
-                  (resolve values))))))))))
+  (let ((promises (mapcar (lambda (p)
+                            (if (promise-obj-p p)
+                                p
+                              (resolved-promise p)))
+                          promises)))
+    (promise
+     (lambda (resolve reject)
+       (let ((i 0))
+         (dolist (prom promises)
+           (regardless prom
+             (lambda (err val status)
+               (if (eql status :rejected)
+                   (funcall reject err)
+                 (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
+                   (funcall resolve (mapcar
+                                     (lambda (p) (promise-obj-resolve p))
+                                     promises)))))
+             t)
+           (incf i)))))))
+
+
 
 
 (provide 'promises)
