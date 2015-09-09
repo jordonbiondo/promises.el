@@ -54,7 +54,9 @@
   delay
   timer
   perform
-  listeners)
+  listeners
+  canceled
+  kicked-off)
 
 (defun promise--resolve (prom val)
   (setf (promise-obj-resolve prom) val)
@@ -74,14 +76,17 @@
       (promise--kickoff listener))))
 
 (defun promise--kickoff (prom)
-  (let ((delay (promise-obj-delay prom)))
-    (if delay
-        (setf (promise-obj-timer prom)
-              (run-with-timer
-               delay nil
-               (lambda ()
-                 (apply (promise-obj-perform prom) nil))))
-      (apply (promise-obj-perform prom) nil))))
+  (unless (or (promise-obj-canceled prom) (promise-obj-kicked-off prom))
+    (let ((delay (promise-obj-delay prom)))
+      (if delay
+          (setf (promise-obj-timer prom)
+                (run-with-timer
+                 delay nil
+                 (lambda ()
+                   (unless (promise-obj-canceled prom)
+                     (apply (promise-obj-perform prom) nil)))))
+        (apply (promise-obj-perform prom) nil))
+      (setf (promise-obj-kicked-off prom) t))))
 
 (defun make-promise (func)
   (let ((obj (make-promise-obj)))
@@ -129,8 +134,8 @@ this is equivalent to:
              (funcall resolve value)
            (funcall reject \"Invalid Value\")))))"
   (declare (indent 1))
-  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-param")))
-        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-param"))))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
 
     `(promise
       (lambda (,resolve-param ,reject-param)
@@ -141,14 +146,14 @@ this is equivalent to:
 (defun resolved-promise (val)
   "Create a promise immediately resolved with VAL."
   (promise* (resolve reject)
-    (resolve val)))
+            (resolve val)))
 
 (defun rejected-promise (val)
   "Create a promise immediately rejecting VAL."
   (promise* (resolve reject)
-    (reject val)))
+            (reject val)))
 
-(defun delay (func)
+(defun promise-later (func)
   "Create a promise that will execute on a 0 second timer.
 
 Effectively this will wait to run until the current stack clears."
@@ -157,17 +162,35 @@ Effectively this will wait to run until the current stack clears."
     (promise--kickoff p)
     p))
 
+(defun delay (func)
+  (make-promise func))
+
 (defmacro delay* (args &rest body)
   (declare (indent 1))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
         (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
+
     `(delay
       (lambda (,resolve-param ,reject-param)
         (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
                     (,(cadr args) (value) (funcall ,reject-param value)))
           ,@body)))))
 
-(defun delay-time (seconds func)
+(defun delay-start (prom)
+  (promise--kickoff prom)
+  prom)
+
+(defmacro promise-later* (args &rest body)
+  (declare (indent 1))
+  (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
+        (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
+    `(promise-later
+      (lambda (,resolve-param ,reject-param)
+        (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                    (,(cadr args) (value) (funcall ,reject-param value)))
+          ,@body)))))
+
+(defun promise-later-time (seconds func)
   "Create a promise that will execute after SECONDS."
   (declare (indent 1))
   (let ((p (make-promise func)))
@@ -175,15 +198,15 @@ Effectively this will wait to run until the current stack clears."
     (promise--kickoff p)
     p))
 
-(defmacro delay-time* (seconds args &rest body)
+(defmacro promise-later-time* (seconds args &rest body)
   (declare (indent 2))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
         (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
-    `(delay-time ,seconds
-       (lambda (,resolve-param ,reject-param)
-         (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
-                     (,(cadr args) (value) (funcall ,reject-param value)))
-           ,@body)))))
+    `(promise-later-time ,seconds
+                         (lambda (,resolve-param ,reject-param)
+                           (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                                       (,(cadr args) (value) (funcall ,reject-param value)))
+                             ,@body)))))
 
 (defun promisep (promise)
   (promise-obj-p promise))
@@ -219,16 +242,17 @@ or reject on an error that occurs in FUNC."
                                       (and with-status (list status)))))))
                     (if (promisep output)
                         (regardless output
-                          (lambda (err value)
-                            (if err
-                                (funcall reject err)
-                              (funcall resolve value))))
+                                    (lambda (err value)
+                                      (if err
+                                          (funcall reject err)
+                                        (funcall resolve value))))
                       (funcall resolve output))))))))
     (promise--listen obj promise)
     obj))
 
 (defmacro regardless* (promise args &rest body)
   "TODO: write docs."
+  (declare (indent defun))
   `(regardless ,promise (lambda ,args ,@body) ,(= (length args) 3)))
 
 (defun then (promise func &optional err-func)
@@ -251,10 +275,10 @@ or ERR-FUNC, or reject on an error that occurs in the called function."
                              (resolved-promise value)))))
                     (if (promisep output)
                         (regardless output
-                          (lambda (err value)
-                            (if err
-                                (funcall reject err)
-                              (funcall resolve value))))
+                                    (lambda (err value)
+                                      (if err
+                                          (funcall reject err)
+                                        (funcall resolve value))))
                       (funcall resolve output))))))))
     (promise--listen obj promise)
     obj))
@@ -265,11 +289,28 @@ or ERR-FUNC, or reject on an error that occurs in the called function."
   `(then ,promise (lambda ,args ,@body)))
 
 (defun on-error (promise err-func)
-  "TODO: write docs."
+  "Handle a rejected or erroring PROMISE with ERR-FUNC.
+
+If PROMISE rejects or encounters an error, apply ERR-FUNC
+with one arg, the error or rejected value of PROMISE.
+
+    (on-error prom my-err-handler)
+
+    is equivalent to:
+
+    (then prom nil my-err-handler)"
   (then promise nil err-func))
 
 (defmacro on-error* (promise args &rest body)
-  "TODO: write docs."
+  "Handle a rejected PROMISE using ARGS and BODY.
+
+This is a convenience wrapper for `on-error'.
+
+    (on-error* promise (err) (message err))
+
+    is equivalent to:
+
+    (on-error promise (lambda (err) (message err)))"
   (declare (indent defun))
   `(on-error ,promise (lambda ,args ,@body)))
 
@@ -291,8 +332,7 @@ Example:
 
     (then (funcall (promisify 'foo 2) 1 2 3)
           (lambda (err value)
-            (print value))) ; prints '(6)
-"
+            (print value))) ; prints '(6)"
   (lambda (&rest args)
     (promise
      (lambda (resolve reject)
@@ -321,12 +361,12 @@ with any errors that may occur."
                (list 'val (apply func nil))
              (error (list 'err err))))))
     (promise* (ok nope)
-      (async-start
-       wrapped-func
-       (lambda (val)
-         (if (equal (car val) 'val)
-             (ok (cadr val))
-           (nope (cadr val))))))))
+              (async-start
+               wrapped-func
+               (lambda (val)
+                 (if (equal (car val) 'val)
+                     (ok (cadr val))
+                   (nope (cadr val))))))))
 
 (defmacro promise-async* (&rest body)
   `(promise-async (lambda () ,@body)))
@@ -342,14 +382,14 @@ with any errors that may occur."
        (let ((i 0))
          (dolist (prom promises)
            (regardless prom
-             (lambda (err val status)
-               (if (eql status :rejected)
-                   (funcall reject err)
-                 (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
-                   (funcall resolve (mapcar
-                                     (lambda (p) (promise-obj-resolve p))
-                                     promises)))))
-             t)
+                       (lambda (err val status)
+                         (if (eql status :rejected)
+                             (funcall reject err)
+                           (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
+                             (funcall resolve (mapcar
+                                               (lambda (p) (promise-obj-resolve p))
+                                               promises)))))
+                       t)
            (incf i)))))))
 
 (provide 'promises)
