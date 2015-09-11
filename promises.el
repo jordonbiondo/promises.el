@@ -99,6 +99,7 @@
                 (error (funcall reject err)))))
       obj)))
 
+;;;###autoload
 (defun promise (func)
   "Create a new promise that will execute FUNC.
 
@@ -107,6 +108,7 @@ FUNC must be in the form (lambda (resolve reject) ...)."
     (promise--kickoff obj)
     obj))
 
+;;;###autoload
 (defmacro promise* (args &rest body)
   "Convenience wrapper for `promise'.
 
@@ -143,16 +145,19 @@ this is equivalent to:
                     (,(cadr args) (value) (funcall ,reject-param value)))
           ,@body)))))
 
+;;;###autoload
 (defun resolved-promise (val)
   "Create a promise immediately resolved with VAL."
   (promise* (resolve reject)
             (resolve val)))
 
+;;;###autoload
 (defun rejected-promise (val)
   "Create a promise immediately rejecting VAL."
   (promise* (resolve reject)
             (reject val)))
 
+;;;###autoload
 (defun promise-later (func)
   "Create a promise that will execute on a 0 second timer.
 
@@ -162,9 +167,11 @@ Effectively this will wait to run until the current stack clears."
     (promise--kickoff p)
     p))
 
+;;;###autoload
 (defun delay (func)
   (make-promise func))
 
+;;;###autoload
 (defmacro delay* (args &rest body)
   (declare (indent 1))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
@@ -176,10 +183,12 @@ Effectively this will wait to run until the current stack clears."
                     (,(cadr args) (value) (funcall ,reject-param value)))
           ,@body)))))
 
+;;;###autoload
 (defun delay-start (prom)
   (promise--kickoff prom)
   prom)
 
+;;;###autoload
 (defmacro promise-later* (args &rest body)
   (declare (indent 1))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
@@ -190,6 +199,7 @@ Effectively this will wait to run until the current stack clears."
                     (,(cadr args) (value) (funcall ,reject-param value)))
           ,@body)))))
 
+;;;###autoload
 (defun promise-later-time (seconds func)
   "Create a promise that will execute after SECONDS."
   (declare (indent 1))
@@ -198,6 +208,7 @@ Effectively this will wait to run until the current stack clears."
     (promise--kickoff p)
     p))
 
+;;;###autoload
 (defmacro promise-later-time* (seconds args &rest body)
   (declare (indent 2))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
@@ -216,6 +227,7 @@ Effectively this will wait to run until the current stack clears."
       (promise--kickoff listener)
     (push listener (promise-obj-listeners notifier))))
 
+;;;###autoload
 (defun regardless (promise func &optional with-status)
   "After PROMISE resolves or is rejected, run FUNC.
 
@@ -250,11 +262,13 @@ or reject on an error that occurs in FUNC."
     (promise--listen obj promise)
     obj))
 
+;;;###autoload
 (defmacro regardless* (promise args &rest body)
   "TODO: write docs."
   (declare (indent defun))
   `(regardless ,promise (lambda ,args ,@body) ,(= (length args) 3)))
 
+;;;###autoload
 (defun then (promise func &optional err-func)
   "After PROMISE resolves run FUNC, or if rejected, run ERR-FUNC.
 
@@ -283,11 +297,13 @@ or ERR-FUNC, or reject on an error that occurs in the called function."
     (promise--listen obj promise)
     obj))
 
+;;;###autoload
 (defmacro then* (promise args &rest body)
   "TODO: write docs."
   (declare (indent defun))
   `(then ,promise (lambda ,args ,@body)))
 
+;;;###autoload
 (defun on-error (promise err-func)
   "Handle a rejected or erroring PROMISE with ERR-FUNC.
 
@@ -301,6 +317,7 @@ with one arg, the error or rejected value of PROMISE.
     (then prom nil my-err-handler)"
   (then promise nil err-func))
 
+;;;###autoload
 (defmacro on-error* (promise args &rest body)
   "Handle a rejected PROMISE using ARGS and BODY.
 
@@ -314,6 +331,7 @@ This is a convenience wrapper for `on-error'.
   (declare (indent defun))
   `(on-error ,promise (lambda ,args ,@body)))
 
+;;;###autoload
 (defun promisify (func &optional n)
   "Promisify a callback-based function FUNC.
 
@@ -349,6 +367,7 @@ Example:
                        (append args (list callback)))))
            (setq output-value (apply func args))))))))
 
+;;;###autoload
 (defun promise-async (func)
   "Create an asynchronous promise using `async-start'
 
@@ -368,10 +387,12 @@ with any errors that may occur."
                      (ok (cadr val))
                    (nope (cadr val))))))))
 
+;;;###autoload
 (defmacro promise-async* (&rest body)
   (declare (indent defun))
   `(promise-async (lambda () ,@body)))
 
+;;;###autoload
 (defun promise-all (promises)
   (let ((promises
          (mapcar
