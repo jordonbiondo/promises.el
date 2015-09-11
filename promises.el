@@ -372,11 +372,13 @@ with any errors that may occur."
   `(promise-async (lambda () ,@body)))
 
 (defun promise-all (promises)
-  (let ((promises (mapcar (lambda (p)
-                            (if (promise-obj-p p)
-                                p
-                              (resolved-promise p)))
-                          promises)))
+  (let ((promises
+         (mapcar
+          (lambda (p)
+            (if (promise-obj-p p)
+                p
+              (resolved-promise p)))
+          promises)))
     (promise
      (lambda (resolve reject)
        (let ((i 0))
