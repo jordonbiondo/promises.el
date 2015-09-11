@@ -394,6 +394,14 @@ with any errors that may occur."
                        t)
            (incf i)))))))
 
+;;;###autoload
+(defmacro chain (&rest args)
+  "Easy promise chaining for ARGS.
+
+This is just a alias for `->'."
+  (declare (indent 1))
+  `(-> ,@args))
+
 (provide 'promises)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; promises.el ends here
