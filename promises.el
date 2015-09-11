@@ -369,6 +369,7 @@ with any errors that may occur."
                    (nope (cadr val))))))))
 
 (defmacro promise-async* (&rest body)
+  (declare (indent defun))
   `(promise-async (lambda () ,@body)))
 
 (defun promise-all (promises)
