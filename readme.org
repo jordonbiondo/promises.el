@@ -1,5 +1,13 @@
 * promises.el
   Promises for Emacs
+
+  - the API is very similar to the ES6 promise API.
+
+  - supports explicitly asynchronous promises powered by `async.el`
+
+  - supports promisifying callback-based functions
+
+
 ** Examples
    #+BEGIN_SRC emacs-lisp
      ;; prints 15
@@ -18,29 +26,33 @@
        (lambda (values)
          (message "%S" values)))
 
-     ;; using a threading macro and special promise forms
+     ;; using `chain' and special promise forms
      ;; square every number 0-10 asynchronously
      ;; then multiple each by 5 asynchronously
      ;; message the results when done
      ;; if an error occurs anytime during execution log the error
      ;;
      ;; Output: "Results: (0 5 20 45 80 125 180 245 320 405 500)"
-     (-> (promise-all (mapcar
-                       (lambda (v) (promise-async* (expt v 2)))
-                       (number-sequence 0 10)))
-         (then* (values)
-           (promise-all (mapcar
-                         (lambda (v) (promise-async* (* v 5)))
-                         values)))
-         (then* (values)
-           (message "Results: %S" values))
-         (on-error* (err)
-           (message "Oops: %S" err)))
+     (chain (promise-all (mapcar
+                          (lambda (v) (promise-async* (expt v 2)))
+                          (number-sequence 0 10)))
+       (then* (values)
+         (promise-all (mapcar
+                       (lambda (v) (promise-async* (* v 5)))
+                       values)))
+       (then* (values)
+         (message "Results: %S" values))
+       (on-error* (err)
+         (message "Oops: %S" err)))
 
 
      ;; promisifying a callback-based function
+     ;; when the callback would normally be called,
+     ;; the returned promise will resolve with the
+     ;; return value of the promisified function
+     ;; and the callback's args
      (defun my-slow-multiplier (a b callback)
-       "After three seconds run CALLBACK with 
+       "After three seconds run CALLBACK with
      the result of multiplying A and B."
        (run-with-timer
         3
@@ -55,5 +67,87 @@
 
        
 
-
+     ;; Real example: reading possible 'npm run' scripts from package.json,
+     ;; asking user to select one, then running it.
+     (defun my-npm-run ()
+       (interactive)
+       (let ((package-json-file "path/to/package.json"))
+         (chain (promise-async*
+                  (require 'json)
+                  (let ((json (json-read-file package-json-file)))
+                    (cdr (assoc 'scripts json))))
+           (then* (scripts)
+             (promise-later* (resolve reject)
+               (resolve
+                (ido-completing-read "npm run " (mapcar 'symbol-name (mapcar 'car scripts))))))
+           (then* (script)
+             (when script
+               (compile (format "cd %s && npm run %s" "/my/project-dir/" script) t)))
+           (on-error* (err)
+             (print err)))))
    #+END_SRC
+
+** ES6 equivilants
+*** A simple promise
+   #+BEGIN_SRC javascript
+     new Promise (function(resolve, reject) {
+         resolve("ok");
+     });
+   #+END_SRC
+   #+BEGIN_SRC emacs-lisp
+     (promise (lambda (resolve reject)
+                (funcall resolve "ok")))
+
+     ;; also
+
+     (promise* (resolve reject)
+       (resolve "ok"))
+   #+END_SRC
+*** Chaining
+    #+BEGIN_SRC javascript
+      findUser({name: "Bob"})
+          .then(function(user) {
+              user.age++;
+              return user.save()
+          })
+          .then(function (updatedUser) {
+              return updatedUser.age;
+          })
+          .catch(function(error) {
+              return Error("Could not increase age" + error);
+          });
+    #+END_SRC
+    #+BEGIN_SRC emacs-lisp
+      (chain (findUser (list :name "Bob"))
+        (then* (user)
+          (incf (user-age user))
+          (user-save))
+        (then* (update-user)
+          (user-age user))
+        (on-error* (err)
+          (error "Could not increase age. %S" err)))
+    #+END_SRC
+*** Promise.all
+    #+BEGIN_SRC javascript
+      Promise
+          .all([getFoo(), getBar(), 30])
+          .then(function (values) {
+              var foo = values[0];
+              var bar = values[1];
+              var thirty = values[2];
+              doSomething(foo, bar, thirty);
+          }, function (err) {
+              console.log("shucks");
+          });
+    #+END_SRC
+    #+BEGIN_SRC emacs-lisp
+      (chain (promise-all (list (get-foo) (get-bar) 30))
+        (then
+          (lambda (values)
+            (destructuring-bind (foo bar thirty) values
+              (do-somthing foo bar thirty)))
+          (lambda (err)
+            (message "shucks"))))
+
+    #+END_SRC
+
