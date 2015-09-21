@@ -151,13 +151,13 @@ this is equivalent to:
 (defun resolved-promise (val)
   "Create a promise immediately resolved with VAL."
   (promise* (resolve reject)
-            (resolve val)))
+    (resolve val)))
 
 ;;;###autoload
 (defun rejected-promise (val)
   "Create a promise immediately rejecting VAL."
   (promise* (resolve reject)
-            (reject val)))
+    (reject val)))
 
 ;;;###autoload
 (defun promise-later (func)
@@ -216,10 +216,10 @@ Effectively this will wait to run until the current stack clears."
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
         (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
     `(promise-later-time ,seconds
-                         (lambda (,resolve-param ,reject-param)
-                           (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
-                                       (,(cadr args) (value) (funcall ,reject-param value)))
-                             ,@body)))))
+       (lambda (,resolve-param ,reject-param)
+         (cl-labels ((,(car args) (value) (funcall ,resolve-param value))
+                     (,(cadr args) (value) (funcall ,reject-param value)))
+           ,@body)))))
 
 (defun promisep (promise)
   (promise-obj-p promise))
@@ -382,16 +382,15 @@ with any errors that may occur."
                (list 'val (apply func nil))
              (error (list 'err err))))))
     (promise* (ok nope)
-              (async-start
-               wrapped-func
-               (lambda (val)
-                 (if (equal (car val) 'val)
-                     (ok (cadr val))
-                   (nope (cadr val))))))))
+      (async-start
+       wrapped-func
+       (lambda (val)
+         (if (equal (car val) 'val)
+             (ok (cadr val))
+           (nope (cadr val))))))))
 
 ;;;###autoload
 (defmacro promise-async* (&rest body)
-  (declare (indent defun))
   `(promise-async (lambda () ,@body)))
 
 ;;;###autoload
@@ -407,15 +406,16 @@ with any errors that may occur."
      (lambda (resolve reject)
        (let ((i 0))
          (dolist (prom promises)
-           (regardless prom
-                       (lambda (err val status)
-                         (if (eql status :rejected)
-                             (funcall reject err)
-                           (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
-                             (funcall resolve (mapcar
-                                               (lambda (p) (promise-obj-resolve p))
-                                               promises)))))
-                       t)
+           (regardless
+            prom
+            (lambda (err val status)
+              (if (eql status :rejected)
+                  (funcall reject err)
+                (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
+                  (funcall resolve (mapcar
+                                    (lambda (p) (promise-obj-resolve p))
+                                    promises)))))
+            t)
            (incf i)))))))
 
 ;;;###autoload
@@ -423,7 +423,7 @@ with any errors that may occur."
   "Easy promise chaining for ARGS.
 
 This is just a alias for `->'."
-  (declare (indent 1))
+  (declare (indent defun))
   `(-> ,@args))
 
 (provide 'promises)
