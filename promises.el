@@ -59,6 +59,9 @@
   kicked-off)
 
 (defun promise--resolve (prom val)
+  "Set PROM as resolved with VAL.
+
+Internal use only."
   (unless (promise-obj-done prom)
     (setf (promise-obj-resolve prom) val)
     (setf (promise-obj-done prom) t)
@@ -66,6 +69,9 @@
     (promise--notify prom)))
 
 (defun promise--reject (prom val)
+  "Set PROM as rejected with VAL.
+
+Internal use only."
   (unless (promise-obj-done prom)
     (setf (promise-obj-reject prom) val)
     (setf (promise-obj-done prom) t)
@@ -73,11 +79,15 @@
     (promise--notify prom)))
 
 (defun promise--notify (prom)
+  "Notify PROM's listeners that it has finished."
   (let ((listeners (promise-obj-listeners prom)))
     (dolist (listener listeners)
       (promise--kickoff listener))))
 
 (defun promise--kickoff (prom)
+  "Startup the promise PROM.
+
+Internal use only."
   (unless (or (promise-obj-canceled prom) (promise-obj-kicked-off prom))
     (let ((delay (promise-obj-delay prom)))
       (if delay
@@ -91,6 +101,9 @@
       (setf (promise-obj-kicked-off prom) t))))
 
 (defun make-promise (func)
+  "Make a new promise that performs FUNC.
+
+Internal use only."
   (let ((obj (make-promise-obj)))
     (let ((resolve (lambda (val) (promise--resolve obj val)))
           (reject (lambda (val) (promise--reject obj val))))
@@ -171,10 +184,16 @@ Effectively this will wait to run until the current stack clears."
 
 ;;;###autoload
 (defun delay (func)
+  "Like `promise', but it the promise will not run.
+
+You can use `delay-start' to kick off the promise at a later time."
   (make-promise func))
 
 ;;;###autoload
 (defmacro delay* (args &rest body)
+  "Convenience wrapper for `delay'.
+
+Works just like `promise*'."
   (declare (indent 1))
   (let ((resolve-param (make-symbol (concat (symbol-name (car args)) "-arg")))
         (reject-param (make-symbol (concat (symbol-name (cadr args)) "-arg"))))
@@ -187,6 +206,7 @@ Effectively this will wait to run until the current stack clears."
 
 ;;;###autoload
 (defun delay-start (prom)
+  "Activate PROM and return PROM."
   (promise--kickoff prom)
   prom)
 
