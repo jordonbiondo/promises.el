@@ -58,6 +58,14 @@
   canceled
   kicked-off)
 
+(defun promisep (promise)
+  (promise-obj-p promise))
+
+(defun promise--listen (listener notifier)
+  (if (promise-obj-done notifier)
+      (promise--kickoff listener)
+    (push listener (promise-obj-listeners notifier))))
+
 (defun promise--resolve (prom val)
   "Set PROM as resolved with VAL.
 
@@ -241,14 +249,6 @@ Works just like `promise*'."
                      (,(cadr args) (value) (funcall ,reject-param value)))
            ,@body)))))
 
-(defun promisep (promise)
-  (promise-obj-p promise))
-
-(defun promise--listen (listener notifier)
-  (if (promise-obj-done notifier)
-      (promise--kickoff listener)
-    (push listener (promise-obj-listeners notifier))))
-
 ;;;###autoload
 (defun regardless (promise func &optional with-status)
   "After PROMISE resolves or is rejected, run FUNC.
@@ -429,6 +429,7 @@ with any errors that may occur."
            (regardless
             prom
             (lambda (err val status)
+              (ignore val)
               (if (eql status :rejected)
                   (funcall reject err)
                 (when (-all-p (lambda (p) (promise-obj-resolved p)) promises)
