@@ -402,12 +402,16 @@ with any errors that may occur."
                (list 'val (apply func nil))
              (error (list 'err err))))))
     (promise* (ok nope)
-      (async-start
-       wrapped-func
-       (lambda (val)
-         (if (equal (car val) 'val)
-             (ok (cadr val))
-           (nope (cadr val))))))))
+      (condition-case err
+          (async-start
+           wrapped-func
+           (lambda (val)
+             (condition-case ierr
+                 (if (equal (car val) 'val)
+                     (ok (cadr val))
+                   (nope (cadr val)))
+               (error (nope ierr)))))
+        (error (nope err))))))
 
 ;;;###autoload
 (defmacro promise-async* (&rest body)
