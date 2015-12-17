@@ -441,7 +441,7 @@ with any errors that may occur."
                                     (lambda (p) (promise-obj-resolve p))
                                     promises)))))
             t)
-           (incf i)))))))
+           (cl-incf i)))))))
 
 ;;;###autoload
 (defmacro chain (&rest args)
