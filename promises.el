@@ -444,6 +444,16 @@ with any errors that may occur."
            (cl-incf i)))))))
 
 ;;;###autoload
+(defun spread (promise func)
+  (then* promise (vals)
+    (apply func (if (listp vals) vals (list vals)))))
+
+;;;###autoload
+(defmacro spread* (promise args &rest body)
+  (declare (indent defun))
+  `(spread ,promise (lambda ,args ,@body)))
+
+;;;###autoload
 (defmacro chain (&rest args)
   "Easy promise chaining for ARGS.
 
