@@ -7,12 +7,11 @@
 
   - supports promisifying callback-based functions
 
-
 ** Examples
    #+BEGIN_SRC emacs-lisp
      ;; prints 15
-     (let ((my-promise 
-            (promise 
+     (let ((my-promise
+            (promise
              (lambda (reject resolve)
                (funcall resolve 5)))))
        (regardless my-promise
@@ -65,7 +64,7 @@
        (destructuring-bind (return-value result) output
          (message "Got: %S" result)))
 
-       
+
 
      ;; Real example: reading possible 'npm run' scripts from package.json,
      ;; asking user to select one, then running it.
@@ -85,6 +84,47 @@
                (compile (format "cd %s && npm run %s" "/my/project-dir/" script) t)))
            (on-error* (err)
              (print err)))))
+   #+END_SRC
+
+   #+BEGIN_SRC emacs-lisp
+     ;; Another useful example:
+
+     ;; Below is a function that runs a shell command asynchronously
+     ;; and returns a promise. The promise resolves with the output
+     ;; of the shell command, or rejects with a list in the form:
+     ;; (ERROR-STATUS OUTPUT).
+
+
+     (setq lexical-binding t)
+
+     (defun async-shell-command-to-string (command)
+       (promise* (ok nope)
+         (condition-case err
+             (let* ((command-buffer (generate-new-buffer "*async-sc-promise*"))
+                    (proc (apply 'start-process "*async-sc-promise*" command-buffer
+                                 shell-file-name shell-command-switch (list command)))
+                    (sentinal-fn
+                     (lambda (proc status)
+                       (unwind-protect
+                           (condition-case err
+                               (unless (process-live-p proc)
+                                 (let ((string (with-current-buffer command-buffer (buffer-string))))
+                                   (if (zerop (process-exit-status proc))
+                                       (ok string)
+                                     (nope (list status string)))))
+                             (error (nope err)))
+                         (ignore-errors (kill-buffer command-buffer))))))
+               (set-process-sentinel proc sentinal-fn))
+           (error (nope err)))))
+
+
+     (chain (async-shell-command-to-string "bash -c 'ecxho hi'")
+       (then* (val)
+         (message "val %s" (string-trim val)))
+       (on-error* (err)
+         (message "status: %s, output: %s"
+                  (string-trim (car err))
+                  (string-trim (cadr err)))))
    #+END_SRC
 
 ** ES6 equivilants
@@ -150,4 +190,15 @@
             (message "shucks"))))
 
     #+END_SRC
+** Notable differences with other promise apis:
+   Promise are not explicitely asynchronous or delayed. The body is executed immediately before `promise` exits.
+   #+BEGIN_SRC emacs-lisp
+     ;; In this scenario "a" is guaranteed to be messaged before "b"
+
+     (progn
+       (promise
+        (lambda (resolve reject)
+          (funcall resolve (message "a"))))
+       (message "b"))
+   #+END_SRC
 
