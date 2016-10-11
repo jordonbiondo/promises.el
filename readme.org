@@ -1,7 +1,7 @@
 * promises.el
   Promises for Emacs
 
-  - the API is very similar to the ES6 promise API.
+  - the API is very similar to the A+ promise API.
 
   - supports explicitly asynchronous promises powered by `async.el`
 
@@ -127,10 +127,10 @@
                   (string-trim (cadr err)))))
    #+END_SRC
 
-** ES6 equivilants
+** Javascript equivilants
 *** A simple promise
    #+BEGIN_SRC javascript
-     new Promise (function(resolve, reject) {
+     new Promise ((resolve, reject) => {
          resolve("ok");
      });
    #+END_SRC
@@ -146,14 +146,14 @@
 *** Chaining
     #+BEGIN_SRC javascript
       findUser({name: "Bob"})
-          .then(function(user) {
+          .then((user) => {
               user.age++;
               return user.save()
           })
-          .then(function (updatedUser) {
+          .then((updatedUser) => {
               return updatedUser.age;
           })
-          .catch(function(error) {
+          .catch((error) => {
               return Error("Could not increase age" + error);
           });
     #+END_SRC
@@ -171,12 +171,12 @@
     #+BEGIN_SRC javascript
       Promise
           .all([getFoo(), getBar(), 30])
-          .then(function (values) {
+          .then((values) => {
               var foo = values[0];
               var bar = values[1];
               var thirty = values[2];
               doSomething(foo, bar, thirty);
-          }, function (err) {
+          }, (err) => {
               console.log("shucks");
           });
     #+END_SRC
@@ -201,4 +201,4 @@
           (funcall resolve (message "a"))))
        (message "b"))
    #+END_SRC
-
+   
